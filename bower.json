@@ -1,0 +1,21 @@
+{
+  "name": "geoloc",
+  "version": "0.1.0",
+  "homepage": "https://github.com/2gis/geoloc",
+  "authors": [
+    "Dmitry Vibe <riim@yandex.ru>"
+  ],
+  "main": "dist/GeoLoc.js",
+  "license": "MIT",
+  "private": false,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jsonp-request": "*"
+  }
+}
