@@ -24,12 +24,17 @@
 	 * @constructor
 	 *
 	 * @param {Object} [options]
+	 * @param {int} [providerTimeout=10000]
 	 * @param {int} [maximumAge=1000*60*60*24]
 	 * @param {Array<GeoLoc.Provider>} [options.providers]
 	 */
 	function GeoLoc(options) {
 		if (!options) {
 			options = {};
+		}
+
+		if (options.providerTimeout) {
+			this.providerTimeout = options.providerTimeout;
 		}
 
 		if (options.maximumAge) {
@@ -73,6 +78,8 @@
 	GeoLoc.prototype = {
 		constructor: GeoLoc,
 
+		providerTimeout: 10000,
+
 		maximumAge: 1000 * 60 * 60 * 24,
 
 		providers: null,
@@ -108,6 +115,8 @@
 				}
 			}
 
+			var providerTimeout = this.providerTimeout;
+
 			(function getPosition(providers) {
 				var provider = providers.shift();
 
@@ -135,7 +144,7 @@
 							cb(null, data);
 						}
 					}
-				});
+				}, { timeout: providerTimeout });
 			})(this.providers.slice(0));
 
 			return this;

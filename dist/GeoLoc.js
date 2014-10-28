@@ -105,12 +105,17 @@
 	 * @constructor
 	 *
 	 * @param {Object} [options]
+	 * @param {int} [providerTimeout=10000]
 	 * @param {int} [maximumAge=1000*60*60*24]
 	 * @param {Array<GeoLoc.Provider>} [options.providers]
 	 */
 	function GeoLoc(options) {
 		if (!options) {
 			options = {};
+		}
+
+		if (options.providerTimeout) {
+			this.providerTimeout = options.providerTimeout;
 		}
 
 		if (options.maximumAge) {
@@ -154,6 +159,8 @@
 	GeoLoc.prototype = {
 		constructor: GeoLoc,
 
+		providerTimeout: 10000,
+
 		maximumAge: 1000 * 60 * 60 * 24,
 
 		providers: null,
@@ -189,6 +196,8 @@
 				}
 			}
 
+			var providerTimeout = this.providerTimeout;
+
 			(function getPosition(providers) {
 				var provider = providers.shift();
 
@@ -216,7 +225,7 @@
 							cb(null, data);
 						}
 					}
-				});
+				}, { timeout: providerTimeout });
 			})(this.providers.slice(0));
 
 			return this;
@@ -230,8 +239,8 @@
 // freegeoip_net.js
 
 GeoLoc.providers['freegeoip_net'] = {
-	getPosition: function(cb) {
-		jsonpRequest.send('http://freegeoip.net/json/', function(err, data) {
+	getPosition: function(cb, options) {
+		jsonpRequest.send('http://freegeoip.net/json/', options && { timeout: options.timeout }, function(err, data) {
 			cb(err, data && {
 				latitude: data.latitude,
 				longitude: data.longitude
@@ -243,8 +252,8 @@ GeoLoc.providers['freegeoip_net'] = {
 // telize_com.js
 
 GeoLoc.providers['telize_com'] = {
-	getPosition: function(cb) {
-		jsonpRequest.send('http://www.telize.com/geoip/', function(err, data) {
+	getPosition: function(cb, options) {
+		jsonpRequest.send('http://www.telize.com/geoip/', options && { timeout: options.timeout }, function(err, data) {
 			cb(err, data && {
 				latitude: data.latitude,
 				longitude: data.longitude
