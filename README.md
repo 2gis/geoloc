@@ -5,6 +5,19 @@ geoloc
 При неработоспособности одного провайдера автоматически опрашивает следующего.  
 Чтобы не задолбать какого-нибудь провайдера, кеширует результат в localStorage на указанный период (по умолчанию - сутки).
 
+###Установка
+
+В консоли:
+```
+bower install geoloc 
+```
+Добавить на страницу:
+```html
+<script src="bower_components/geoloc/dist/GeoLoc.min.js"></script>
+```
+
+###Использование
+
 **GeoLoc.getPosition** - получение позиции  
 Пример:
 ```js
@@ -22,9 +35,9 @@ GeoLoc.getPosition(function(err, pos) {
 Пример:
 ```js
 GeoLoc.setDefaultProviders([
-	GeoLoc.providers['freegeoip_net'],
-	GeoLoc.providers['telize_com'],
-	GeoLoc.providers['html5geolocation']
+    GeoLoc.providers['freegeoip_net'],
+    GeoLoc.providers['telize_com'],
+    GeoLoc.providers['html5geolocation']
 ]);
 ```
 
