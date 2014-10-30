@@ -14,6 +14,8 @@ var jscs = require('gulp-jscs');
 
 var mainScripts = [
 	'bower_components/jsonp-request/jsonpRequest.js',
+
+	'src/_head.js'
 	'src/GeoLoc.js',
 	'src/providers/freegeoip_net.js',
 	'src/providers/telize_com.js',
@@ -58,6 +60,6 @@ gulp.task('default', ['geoloc-main'], function() {
 });
 
 gulp.task('lint', function() {
-	return gulp.src(mainScripts)
+	return gulp.src(mainScripts.slice(2, -1))
 		.pipe(jscs());
 });
