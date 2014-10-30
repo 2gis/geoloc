@@ -15,7 +15,7 @@ var jscs = require('gulp-jscs');
 var mainScripts = [
 	'bower_components/jsonp-request/jsonpRequest.js',
 
-	'src/_head.js'
+	'src/_head.js',
 	'src/GeoLoc.js',
 	'src/providers/freegeoip_net.js',
 	'src/providers/telize_com.js',
