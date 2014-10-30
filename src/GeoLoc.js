@@ -1,5 +1,7 @@
 // GeoLoc.js
 
+var global = (function() { return this; })();
+
 var defaultProviders = [];
 
 /**
@@ -72,6 +74,9 @@ GeoLoc.getPosition = function(cb, options) {
 	return new GeoLoc(options).getPosition(cb);
 };
 
+/**
+ * @lends GeoLoc#
+ */
 GeoLoc.prototype = {
 	constructor: GeoLoc,
 
@@ -155,5 +160,5 @@ if (typeof exports != 'undefined') {
 		exports.GeoLoc = GeoLoc;
 	}
 } else {
-	(function() { return this; })().GeoLoc = GeoLoc;
+	global.GeoLoc = GeoLoc;
 }
