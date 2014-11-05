@@ -1,8 +1,8 @@
 {
   "name": "geoloc",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "geoloc",
-  "main": "gulpfile.js",
+  "main": "dist/GeoLoc.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -81,7 +81,7 @@
 
 // _head.js
 
-(function(undefined) {
+;(function(undefined) {
 'use strict';
 
 // GeoLoc.js
@@ -299,10 +299,10 @@ GeoLoc.providers['html5geolocation'] = {
 
 // _tail.js
 
-})();
-
 GeoLoc.setDefaultProviders([
 	GeoLoc.providers['freegeoip_net'],
 	GeoLoc.providers['telize_com'],
 	GeoLoc.providers['html5geolocation']
 ]);
+
+})();
