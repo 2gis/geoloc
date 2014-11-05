@@ -1,4 +1,4 @@
 // _head.js
 
-(function(undefined) {
+;(function(undefined) {
 'use strict';
