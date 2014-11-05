@@ -66,11 +66,16 @@ GeoLoc.use = function(providers) {
 };
 
 /**
- * @param {Function} cb
  * @param {Object} [options]
+ * @param {Function} cb
  * @returns {GeoLoc}
  */
-GeoLoc.getPosition = function(cb, options) {
+GeoLoc.getPosition = function(options, cb) {
+	if (typeof options == 'function') {
+		cb = options;
+		options = {};
+	}
+
 	return new GeoLoc(options).getPosition(cb);
 };
 
