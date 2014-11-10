@@ -1,7 +1,7 @@
 
 (function(undefined) {
 
-	var callbackIdCounter = 0;
+	var idCounter = 0;
 
 	/**
 	 * @param {string} url
@@ -23,10 +23,16 @@
 		}
 
 		var callbackKey = options.callbackKey || 'callback';
-		var callbackName = options.callbackName || '__callback' + (++callbackIdCounter);
+		var callbackName = options.callbackName || '__callback' + (++idCounter);
 		var preventCaching = options.preventCaching !== false;
 		var cachingPreventionKey = options.cachingPreventionKey || 'noCache';
 		var timeout = options.timeout || 120000;
+
+		var expired = false;
+		var aborted = false;
+		var loaded = false;
+		var success = false;
+		var disposed = false;
 
 		var script = document.createElement('script');
 
@@ -35,27 +41,71 @@
 
 		script.async = true;
 
+		script.onload = script.onreadystatechange = function() {
+			if ((script.readyState && script.readyState != 'complete' && script.readyState != 'loaded') || loaded) {
+				return;
+			}
+
+			loaded = true;
+
+			setTimeout(function() {
+				if (success) {
+					return;
+				}
+
+				dispose();
+
+				if (expired || aborted) {
+					return;
+				}
+
+				cb(new Error('Invalid response or loading error'), null);
+			}, 1);
+		};
+
 		script.onerror = function() {
+			if (success) {
+				return;
+			}
+
 			dispose();
+
+			if (expired || aborted) {
+				return;
+			}
+
 			cb(new Error('Script error'), null);
 		};
 
 		var timerId = setTimeout(function() {
-			dispose();
+			if (aborted) {
+				return;
+			}
+
+			expired = true;
+
 			cb(new Error('Timeout error'), null);
 		}, timeout);
 
 		window[callbackName] = function(data) {
 			dispose();
+
+			if (expired || aborted) {
+				return;
+			}
+
+			success = true;
 			cb(null, data);
 		};
 
-		var disposed = false;
-
 		function dispose() {
+			if (disposed) {
+				return;
+			}
+
 			disposed = true;
 
-			script.onerror = null;
+			script.onload = script.onreadystatechange = script.onerror = null;
 			clearTimeout(timerId);
 			delete window[callbackName];
 			script.parentNode.removeChild(script);
@@ -65,10 +115,7 @@
 
 		return {
 			abort: function() {
-				if (!disposed) {
-					dispose();
-					cb(new Error('Aborted'), null);
-				}
+				aborted = true;
 			}
 		};
 	}
@@ -86,7 +133,8 @@
 
 // GeoLoc.js
 
-var global = (function() { return this; })();
+var global = typeof window == 'undefined' ? global : window;
+var uidCounter = 0;
 
 var defaultProviders = [];
 
@@ -153,16 +201,14 @@ GeoLoc.use = function(providers) {
 
 /**
  * @param {Object} [options]
+ * @param {int} [providerTimeout=10000]
+ * @param {int} [maximumAge=1000*60*60*24]
+ * @param {Array<GeoLoc.Provider>} [options.providers]
  * @param {Function} cb
  * @returns {GeoLoc}
  */
 GeoLoc.getPosition = function(options, cb) {
-	if (typeof options == 'function') {
-		cb = options;
-		options = {};
-	}
-
-	return new GeoLoc(options).getPosition(cb);
+	return new GeoLoc().getPosition(options, cb);
 };
 
 /**
@@ -187,10 +233,9 @@ GeoLoc.prototype = {
 	},
 
 	/**
-	 * @param {Function} cb
-	 * @returns {GeoLoc}
+	 * @private
 	 */
-	getPosition: function(cb) {
+	_getPositionFromLocalStorage: function(maximumAge) {
 		var storedData = localStorage.getItem('_GeoLocData');
 
 		if (storedData) {
@@ -198,17 +243,115 @@ GeoLoc.prototype = {
 
 			var timeStamp = Number(storedData[2]);
 
-			if (Date.now() - timeStamp <= this.maximumAge) {
-				cb(null, {
+			if (Date.now() - timeStamp <= maximumAge) {
+				return {
 					latitude: Number(storedData[0]),
 					longitude: Number(storedData[1])
-				});
-
-				return this;
+				};
 			}
 		}
 
-		var providerTimeout = this.providerTimeout;
+		return null;
+	},
+
+	/**
+	 * @param {Object} [options]
+	 * @param {int} [providerTimeout=10000]
+	 * @param {int} [maximumAge=1000*60*60*24]
+	 * @param {Array<GeoLoc.Provider>} [options.providers]
+	 * @param {Function} cb
+	 * @returns {GeoLoc}
+	 */
+	getPositionParallel: function(options, cb) {
+		if (typeof options == 'function') {
+			cb = options;
+			options = {};
+		}
+
+		var pos = this._getPositionFromLocalStorage(options.maximumAge || this.maximumAge);
+
+		if (pos) {
+			cb(null, pos);
+			return this;
+		}
+
+		var providerTimeout = options.providerTimeout || this.providerTimeout;
+		var providers = options.providers || this.providers;
+
+		var requests = {};
+
+		function abortAllRequests() {
+			for (var id in requests) {
+				requests[id].abort();
+				delete requests[id];
+			}
+		}
+
+		function hasRequests() {
+			for (var any in requests) {
+				return true;
+			}
+			return false;
+		}
+
+		providers.forEach(function(provider) {
+			var req = provider.getPosition(function(err, data) {
+				delete requests[req._GeoLoc_id];
+
+				if (err) {
+					if (!hasRequests()) {
+						cb(err, null);
+					}
+				} else {
+					if (typeof data.latitude != 'number' || typeof data.longitude != 'number') {
+						if (!hasRequests()) {
+							cb(new TypeError('Incorrect data'), null);
+						}
+					} else {
+						abortAllRequests();
+
+						localStorage.setItem('_GeoLocData', [
+							data.latitude,
+							data.longitude,
+							Date.now()
+						].join(','));
+
+						cb(null, data);
+					}
+				}
+			}, { timeout: providerTimeout });
+
+			req._GeoLoc_id = ++uidCounter;
+
+			requests[req._GeoLoc_id] = req;
+		}, this);
+
+		return this;
+	},
+
+	/**
+	 * @param {Object} [options]
+	 * @param {int} [providerTimeout=10000]
+	 * @param {int} [maximumAge=1000*60*60*24]
+	 * @param {Array<GeoLoc.Provider>} [options.providers]
+	 * @param {Function} cb
+	 * @returns {GeoLoc}
+	 */
+	getPosition: function(options, cb) {
+		if (typeof options == 'function') {
+			cb = options;
+			options = {};
+		}
+
+		var pos = this._getPositionFromLocalStorage(options.maximumAge || this.maximumAge);
+
+		if (pos) {
+			cb(null, pos);
+			return this;
+		}
+
+		var providerTimeout = options.providerTimeout || this.providerTimeout;
+		var providers = options.providers || this.providers;
 
 		(function getPosition(providers) {
 			var provider = providers.shift();
@@ -258,12 +401,16 @@ if (typeof exports != 'undefined') {
 
 GeoLoc.providers['freegeoip_net'] = {
 	getPosition: function(cb, options) {
-		jsonpRequest.send('http://freegeoip.net/json/', options && { timeout: options.timeout }, function(err, data) {
-			cb(err, data && {
-				latitude: data.latitude,
-				longitude: data.longitude
-			});
-		});
+		return jsonpRequest.send(
+			'http://freegeoip.net/json/',
+			options && { timeout: options.timeout },
+			function(err, data) {
+				cb(err, data && {
+					latitude: data.latitude,
+					longitude: data.longitude
+				});
+			}
+		);
 	}
 };
 
@@ -271,19 +418,23 @@ GeoLoc.providers['freegeoip_net'] = {
 
 GeoLoc.providers['telize_com'] = {
 	getPosition: function(cb, options) {
-		jsonpRequest.send('http://www.telize.com/geoip/', options && { timeout: options.timeout }, function(err, data) {
-			cb(err, data && {
-				latitude: data.latitude,
-				longitude: data.longitude
-			});
-		});
+		return jsonpRequest.send(
+			'http://www.telize.com/geoip/',
+			options && { timeout: options.timeout },
+			function(err, data) {
+				cb(err, data && {
+					latitude: data.latitude,
+					longitude: data.longitude
+				});
+			}
+		);
 	}
 };
 
 // html5geolocation.js
 
 GeoLoc.providers['html5geolocation'] = {
-	getPosition: function(cb) {
+	getPosition: function(cb, options) {
 		if (navigator.geolocation) {
 			navigator.geolocation.getCurrentPosition(
 				function(pos) {
@@ -299,6 +450,8 @@ GeoLoc.providers['html5geolocation'] = {
 		} else {
 			cb(new TypeError('HTML5 Geolocation not supported'), null);
 		}
+
+		return { abort: function() {} };
 	}
 };
 

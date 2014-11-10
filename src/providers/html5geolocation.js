@@ -1,7 +1,7 @@
 // html5geolocation.js
 
 GeoLoc.providers['html5geolocation'] = {
-	getPosition: function(cb) {
+	getPosition: function(cb, options) {
 		if (navigator.geolocation) {
 			navigator.geolocation.getCurrentPosition(
 				function(pos) {
@@ -17,5 +17,7 @@ GeoLoc.providers['html5geolocation'] = {
 		} else {
 			cb(new TypeError('HTML5 Geolocation not supported'), null);
 		}
+
+		return { abort: function() {} };
 	}
 };

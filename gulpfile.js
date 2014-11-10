@@ -44,7 +44,7 @@ gulp.task('server', function() {
 	server.use(express.static('dist'));
 
 	server.get('/', function(req, res) {
-		res.sendFile('index.html',  { root: '.' });
+		res.sendFile('test.html',  { root: '.' });
 	});
 
 	server.listen(8020, function() {

@@ -1,6 +1,7 @@
 // GeoLoc.js
 
-var global = (function() { return this; })();
+var global = typeof window == 'undefined' ? global : window;
+var uidCounter = 0;
 
 var defaultProviders = [];
 
@@ -67,16 +68,14 @@ GeoLoc.use = function(providers) {
 
 /**
  * @param {Object} [options]
+ * @param {int} [providerTimeout=10000]
+ * @param {int} [maximumAge=1000*60*60*24]
+ * @param {Array<GeoLoc.Provider>} [options.providers]
  * @param {Function} cb
  * @returns {GeoLoc}
  */
 GeoLoc.getPosition = function(options, cb) {
-	if (typeof options == 'function') {
-		cb = options;
-		options = {};
-	}
-
-	return new GeoLoc(options).getPosition(cb);
+	return new GeoLoc().getPosition(options, cb);
 };
 
 /**
@@ -101,10 +100,9 @@ GeoLoc.prototype = {
 	},
 
 	/**
-	 * @param {Function} cb
-	 * @returns {GeoLoc}
+	 * @private
 	 */
-	getPosition: function(cb) {
+	_getPositionFromLocalStorage: function(maximumAge) {
 		var storedData = localStorage.getItem('_GeoLocData');
 
 		if (storedData) {
@@ -112,17 +110,115 @@ GeoLoc.prototype = {
 
 			var timeStamp = Number(storedData[2]);
 
-			if (Date.now() - timeStamp <= this.maximumAge) {
-				cb(null, {
+			if (Date.now() - timeStamp <= maximumAge) {
+				return {
 					latitude: Number(storedData[0]),
 					longitude: Number(storedData[1])
-				});
-
-				return this;
+				};
 			}
 		}
 
-		var providerTimeout = this.providerTimeout;
+		return null;
+	},
+
+	/**
+	 * @param {Object} [options]
+	 * @param {int} [providerTimeout=10000]
+	 * @param {int} [maximumAge=1000*60*60*24]
+	 * @param {Array<GeoLoc.Provider>} [options.providers]
+	 * @param {Function} cb
+	 * @returns {GeoLoc}
+	 */
+	getPositionParallel: function(options, cb) {
+		if (typeof options == 'function') {
+			cb = options;
+			options = {};
+		}
+
+		var pos = this._getPositionFromLocalStorage(options.maximumAge || this.maximumAge);
+
+		if (pos) {
+			cb(null, pos);
+			return this;
+		}
+
+		var providerTimeout = options.providerTimeout || this.providerTimeout;
+		var providers = options.providers || this.providers;
+
+		var requests = {};
+
+		function abortAllRequests() {
+			for (var id in requests) {
+				requests[id].abort();
+				delete requests[id];
+			}
+		}
+
+		function hasRequests() {
+			for (var any in requests) {
+				return true;
+			}
+			return false;
+		}
+
+		providers.forEach(function(provider) {
+			var req = provider.getPosition(function(err, data) {
+				delete requests[req._GeoLoc_id];
+
+				if (err) {
+					if (!hasRequests()) {
+						cb(err, null);
+					}
+				} else {
+					if (typeof data.latitude != 'number' || typeof data.longitude != 'number') {
+						if (!hasRequests()) {
+							cb(new TypeError('Incorrect data'), null);
+						}
+					} else {
+						abortAllRequests();
+
+						localStorage.setItem('_GeoLocData', [
+							data.latitude,
+							data.longitude,
+							Date.now()
+						].join(','));
+
+						cb(null, data);
+					}
+				}
+			}, { timeout: providerTimeout });
+
+			req._GeoLoc_id = ++uidCounter;
+
+			requests[req._GeoLoc_id] = req;
+		}, this);
+
+		return this;
+	},
+
+	/**
+	 * @param {Object} [options]
+	 * @param {int} [providerTimeout=10000]
+	 * @param {int} [maximumAge=1000*60*60*24]
+	 * @param {Array<GeoLoc.Provider>} [options.providers]
+	 * @param {Function} cb
+	 * @returns {GeoLoc}
+	 */
+	getPosition: function(options, cb) {
+		if (typeof options == 'function') {
+			cb = options;
+			options = {};
+		}
+
+		var pos = this._getPositionFromLocalStorage(options.maximumAge || this.maximumAge);
+
+		if (pos) {
+			cb(null, pos);
+			return this;
+		}
+
+		var providerTimeout = options.providerTimeout || this.providerTimeout;
+		var providers = options.providers || this.providers;
 
 		(function getPosition(providers) {
 			var provider = providers.shift();
