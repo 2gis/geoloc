@@ -161,7 +161,8 @@ GeoLoc.prototype = {
 			return false;
 		}
 
-		providers.forEach(function(provider) {
+
+		function setData(provider) {
 			var req = provider.getPosition(function(err, data) {
 				delete requests[req._GeoLoc_id];
 
@@ -191,7 +192,11 @@ GeoLoc.prototype = {
 			req._GeoLoc_id = ++uidCounter;
 
 			requests[req._GeoLoc_id] = req;
-		}, this);
+		}
+
+		for (var i = 0, max = providers.length; i < max; i++) {
+			setData(providers[i]);
+		}
 
 		return this;
 	},
